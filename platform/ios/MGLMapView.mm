@@ -75,7 +75,6 @@ CLLocationDegrees MGLDegreesFromRadians(CGFloat radians)
 @property (nonatomic) UIPinchGestureRecognizer *pinch;
 @property (nonatomic) UIRotationGestureRecognizer *rotate;
 @property (nonatomic) UILongPressGestureRecognizer *quickZoom;
-@property (nonatomic) NSMutableArray *bundledStyleURLs;
 @property (nonatomic) NSMapTable *annotationIDsByAnnotation;
 @property (nonatomic) std::vector<uint32_t> annotationsNearbyLastTap;
 @property (nonatomic, weak) id <MGLAnnotation> selectedAnnotation;
@@ -97,6 +96,8 @@ CLLocationDegrees MGLDegreesFromRadians(CGFloat radians)
     mbgl::Map *_mbglMap;
     MBGLView *_mbglView;
     mbgl::DefaultFileSource *_mbglFileSource;
+    
+    NSMutableArray *_bundledStyleURLs;
 
     BOOL _isTargetingInterfaceBuilder;
     CLLocationDegrees _pendingLatitude;
@@ -112,7 +113,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float, std::chrono::seconds::period>(duration));
 }
 
-- (instancetype)initWithFrame:(CGRect)frame
+- (nullable instancetype)initWithFrame:(CGRect)frame
 {
     self = [super initWithFrame:frame];
 
@@ -125,7 +126,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return nil;
 }
 
-- (instancetype)initWithFrame:(CGRect)frame styleURL:(NSURL *)styleURL
+- (nullable instancetype)initWithFrame:(CGRect)frame styleURL:(nullable NSURL *)styleURL
 {
     self = [super initWithFrame:frame];
 
@@ -137,7 +138,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return self;
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder
+- (nullable instancetype)initWithCoder:(nonnull NSCoder *)decoder
 {
     self = [super initWithCoder:decoder];
 
@@ -150,13 +151,13 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return nil;
 }
 
-- (NSString *)accessToken
+- (nullable NSString *)accessToken
 {
     NSAssert(NO, @"-[MGLMapView accessToken] has been removed. Use +[MGLAccountManager accessToken] or get MGLMapboxAccessToken from the Info.plist.");
     return nil;
 }
 
-- (void)setAccessToken:(NSString *)accessToken
+- (void)setAccessToken:(nullable NSString *)accessToken
 {
     NSAssert(NO, @"-[MGLMapView setAccessToken:] has been replaced by +[MGLAccountManager setAccessToken:].\n\nIf you previously set this access token in a storyboard inspectable, select the MGLMapView in Interface Builder and delete the “accessToken” entry from the User Defined Runtime Attributes section of the Identity inspector. Then go to the Info.plist file and set MGLMapboxAccessToken to “%@”.", accessToken);
 }
@@ -166,13 +167,14 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return [NSSet setWithObject:@"styleID"];
 }
 
-- (NSURL *)styleURL
+- (nonnull NSURL *)styleURL
 {
     NSString *styleURLString = @(_mbglMap->getStyleURL().c_str()).mgl_stringOrNilIfEmpty;
+    NSAssert(styleURLString || _isTargetingInterfaceBuilder, @"Invalid style URL string %@", styleURLString);
     return styleURLString ? [NSURL URLWithString:styleURLString] : nil;
 }
 
-- (void)setStyleURL:(NSURL *)styleURL
+- (void)setStyleURL:(nullable NSURL *)styleURL
 {
     if (_isTargetingInterfaceBuilder) return;
 
@@ -438,7 +440,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     }
 }
 
-- (void)setDelegate:(id<MGLMapViewDelegate>)delegate
+- (void)setDelegate:(nullable id<MGLMapViewDelegate>)delegate
 {
     if (_delegate == delegate) return;
 
@@ -1236,6 +1238,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
 {
     if ([self.delegate respondsToSelector:@selector(mapView:annotation:calloutAccessoryControlTapped:)])
     {
+        NSAssert([tap.view isKindOfClass:[UIControl class]], @"Tapped view %@ is not a UIControl", tap.view);
         [self.delegate mapView:self annotation:self.selectedAnnotation
             calloutAccessoryControlTapped:(UIControl *)tap.view];
     }
@@ -1493,7 +1496,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     [self setDirection:direction animated:NO];
 }
 
-- (CLLocationCoordinate2D)convertPoint:(CGPoint)point toCoordinateFromView:(UIView *)view
+- (CLLocationCoordinate2D)convertPoint:(CGPoint)point toCoordinateFromView:(nullable UIView *)view
 {
     CGPoint convertedPoint = [self convertPoint:point fromView:view];
 
@@ -1504,7 +1507,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return MGLLocationCoordinate2DFromLatLng(_mbglMap->latLngForPixel(mbgl::vec2<double>(convertedPoint.x, convertedPoint.y)));
 }
 
-- (CGPoint)convertCoordinate:(CLLocationCoordinate2D)coordinate toPointToView:(UIView *)view
+- (CGPoint)convertCoordinate:(CLLocationCoordinate2D)coordinate toPointToView:(nullable UIView *)view
 {
     mbgl::vec2<double> pixel = _mbglMap->pixelForLatLng(MGLLatLngFromLocationCoordinate2D(coordinate));
 
@@ -1571,24 +1574,24 @@ CLLocationCoordinate2D MGLLocationCoordinate2DFromLatLng(mbgl::LatLng latLng)
     return [NSSet setWithObject:@"styleURL"];
 }
 
-- (NSString *)styleID
+- (nullable NSString *)styleID
 {
     NSURL *styleURL = self.styleURL;
     return [styleURL.scheme isEqualToString:@"mapbox"] ? styleURL.host.mgl_stringOrNilIfEmpty : nil;
 }
 
-- (void)setStyleID:(NSString *)styleID
+- (void)setStyleID:(nullable NSString *)styleID
 {
     self.styleURL = styleID ? [NSURL URLWithString:[NSString stringWithFormat:@"mapbox://%@", styleID]] : nil;
 }
 
-- (NSString *)mapID
+- (nullable NSString *)mapID
 {
     NSAssert(NO, @"-[MGLMapView mapID] has been renamed -[MGLMapView styleID].");
     return nil;
 }
 
-- (void)setMapID:(NSString *)mapID
+- (void)setMapID:(nullable NSString *)mapID
 {
     NSAssert(NO, @"-[MGLMapView setMapID:] has been renamed -[MGLMapView setStyleID:].\n\nIf you previously set this map ID in a storyboard inspectable, select the MGLMapView in Interface Builder and delete the “mapID” entry from the User Defined Runtime Attributes section of the Identity inspector. Then go to the Attributes inspector and enter “%@” into the “Style ID” field.", mapID);
 }
@@ -1648,7 +1651,7 @@ CLLocationCoordinate2D MGLLocationCoordinate2DFromLatLng(mbgl::LatLng latLng)
 
 #pragma mark - Annotations -
 
-- (NSArray *)annotations
+- (nullable NSArray *)annotations
 {
     if ([_annotationIDsByAnnotation count])
     {
@@ -1957,7 +1960,7 @@ CLLocationCoordinate2D MGLLocationCoordinate2DFromLatLng(mbgl::LatLng latLng)
     return [NSSet setWithObject:@"userLocationAnnotationView"];
 }
 
-- (MGLUserLocation *)userLocation
+- (nullable MGLUserLocation *)userLocation
 {
     return self.userLocationAnnotationView.annotation;
 }
