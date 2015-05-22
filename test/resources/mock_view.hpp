@@ -13,7 +13,8 @@ public:
     void activate() override {};
     void deactivate() override {};
     void notify() override {};
-    void invalidate(std::function<void()>) override {};
+    void invalidate() override {}
+    void swap() override {}
 };
 
 }

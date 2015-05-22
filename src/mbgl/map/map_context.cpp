@@ -191,7 +191,11 @@ void MapContext::update() {
             }
         }
 
-        view.invalidate([this] { render(); });
+        if (mayRender) {
+            render();
+        } else {
+            view.invalidate();
+        }
     }
 
     updated = static_cast<UpdateType>(Update::Nothing);
@@ -207,7 +211,14 @@ void MapContext::renderStill(StillImageCallback fn) {
     }
 
     callback = fn;
+    mayRender = true;
     triggerUpdate(Update::RenderStill);
+}
+
+void MapContext::renderSync() {
+    mayRender = true;
+    render();
+    mayRender = false;
 }
 
 void MapContext::render() {
@@ -231,10 +242,14 @@ void MapContext::render() {
     painter->setDebug(data.getDebug());
     painter->render(*style, transformState, data.getAnimationTime());
 
+    mayRender = false;
+
     if (data.mode == MapMode::Still) {
         callback(nullptr, view.readStillImage());
         callback = nullptr;
     }
+
+    view.swap();
 
     // Schedule another rerender when we definitely need a next frame.
     if (data.transform.needsTransition() || style->hasTransitions()) {
@@ -256,7 +271,7 @@ void MapContext::setSourceTileCacheSize(size_t size) {
         for (const auto &source : style->sources) {
             source->setCacheSize(sourceCacheSize);
         }
-        view.invalidate([this] { render(); });
+        view.invalidate();
     }
 }
 
@@ -266,7 +281,7 @@ void MapContext::onLowMemory() {
     for (const auto &source : style->sources) {
         source->onLowMemory();
     }
-    view.invalidate([this] { render(); });
+    view.invalidate();
 }
 
 void MapContext::onTileDataChanged() {

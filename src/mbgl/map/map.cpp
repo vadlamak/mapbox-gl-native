@@ -41,7 +41,7 @@ void Map::renderStill(StillImageCallback callback) {
 }
 
 void Map::renderSync() {
-    context->invokeSync(&MapContext::render);
+    context->invokeSync(&MapContext::renderSync);
 }
 
 void Map::update(Update update_) {
