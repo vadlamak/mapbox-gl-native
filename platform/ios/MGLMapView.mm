@@ -115,40 +115,32 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
 
 - (nullable instancetype)initWithFrame:(CGRect)frame
 {
-    self = [super initWithFrame:frame];
-
-    if (self && [self commonInit])
+    if (self = [super initWithFrame:frame])
     {
+        [self commonInit];
         self.styleURL = nil;
-        return self;
     }
-
-    return nil;
+    return self;
 }
 
 - (nullable instancetype)initWithFrame:(CGRect)frame styleURL:(nullable NSURL *)styleURL
 {
-    self = [super initWithFrame:frame];
-
-    if (self && [self commonInit])
+    if (self = [super initWithFrame:frame])
     {
+        [self commonInit];
         self.styleURL = styleURL;
     }
-
     return self;
 }
 
 - (nullable instancetype)initWithCoder:(nonnull NSCoder *)decoder
 {
-    self = [super initWithCoder:decoder];
-
-    if (self && [self commonInit])
+    if (self = [super initWithCoder:decoder])
     {
+        [self commonInit];
         self.styleURL = nil;
-        return self;
     }
-
-    return nil;
+    return self;
 }
 
 - (nullable NSString *)accessToken
@@ -194,20 +186,14 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     _mbglMap->setStyleURL([[styleURL absoluteString] UTF8String]);
 }
 
-- (BOOL)commonInit
+- (void)commonInit
 {
     _isTargetingInterfaceBuilder = NSProcessInfo.processInfo.mgl_isInterfaceBuilderDesignablesAgent;
 
     // create context
     //
     _context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
-
-    if ( ! _context)
-    {
-        mbgl::Log::Error(mbgl::Event::Setup, "failed to create OpenGL ES context");
-
-        return NO;
-    }
+    NSAssert(_context, @"Failed to create OpenGL ES context.");
 
     // setup accessibility
     //
@@ -395,8 +381,6 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
         MGLEventKeyZoomLevel: @(zoom),
         MGLEventKeyPushEnabled: @([MGLMapboxEvents checkPushEnabled])
     }];
-
-    return YES;
 }
 
 -(void)reachabilityChanged:(NSNotification*)notification
