@@ -5,64 +5,124 @@
 #include <mbgl/util/io.hpp>
 #include <mbgl/util/thread.hpp>
 
+namespace {
+
+const uint64_t timeout = 1000;
+
+}
+
 namespace mbgl {
 
 class MockFileSource::Impl {
 public:
-    Impl(uv_loop_t*, Type type, const std::string& match) : type_(type), match_(match) {}
+    Impl(uv_loop_t* loop, Type type, const std::string& match)
+        : type_(type), match_(match), timer_(loop) {
+        timer_.start(timeout, timeout, [this] { dispatchPendingRequests(); });
+        timer_.unref();
+    }
 
-    void handleRequest(Request* req) const;
+    ~Impl() {
+        timer_.stop();
+    }
+
+    void handleRequest(Request* req);
 
 private:
-    void replyWithFailure(Response* res) const;
-    void replyWithCorruptedData(Response* res, const std::string& url) const;
-    void replyWithSuccess(Response* res, const std::string& url) const;
+    void replyWithSuccess(Request* req) const;
+    void replyWithSuccessWithDelay(Request* req);
+    void replyWithFailure(Request* req) const;
+    void replyWithFailureWithDelay(Request* req);
+    void replyWithCorruptedData(Request* req) const;
+
+    void dispatchPendingRequests();
 
     Type type_;
     std::string match_;
+    std::vector<Request*> pendingRequests_;
+    uv::timer timer_;
 };
 
-void MockFileSource::Impl::replyWithFailure(Response* res) const {
-    res->status = Response::Status::Error;
-    res->message = "Failed by the test case";
+void MockFileSource::Impl::dispatchPendingRequests() {
+    for (auto req : pendingRequests_) {
+        replyWithSuccess(req);
+    }
+
+    pendingRequests_.clear();
 }
 
-void MockFileSource::Impl::replyWithCorruptedData(Response* res, const std::string& url) const {
-    res->status = Response::Status::Successful;
-    res->data = util::read_file(url);
-    res->data.insert(0, "CORRUPTED");
-}
 
-void MockFileSource::Impl::replyWithSuccess(Response* res, const std::string& url) const {
-    res->status = Response::Status::Successful;
-    res->data = util::read_file(url);
-}
-
-void MockFileSource::Impl::handleRequest(Request* req) const {
-    const std::string& url = req->resource.url;
-    std::shared_ptr<Response> response = std::make_shared<Response>();
-
-    if (url.find(match_) == std::string::npos) {
-        replyWithSuccess(response.get(), url);
-        req->notify(response);
+void MockFileSource::Impl::replyWithFailure(Request* req) const {
+    if (req->resource.url.find(match_) == std::string::npos) {
+        replyWithSuccess(req);
         return;
     }
 
+    std::shared_ptr<Response> res = std::make_shared<Response>();
+    res->status = Response::Status::Error;
+    res->message = "Failed by the test case";
+
+    req->notify(res);
+}
+
+void MockFileSource::Impl::replyWithFailureWithDelay(Request* req) {
+    if (req->resource.url.find(match_) == std::string::npos) {
+        pendingRequests_.push_back(req);
+        return;
+    }
+
+    std::shared_ptr<Response> res = std::make_shared<Response>();
+    res->status = Response::Status::Error;
+    res->message = "Failed by the test case";
+
+    req->notify(res);
+}
+
+void MockFileSource::Impl::replyWithCorruptedData(Request* req) const {
+    if (req->resource.url.find(match_) == std::string::npos) {
+        replyWithSuccess(req);
+        return;
+    }
+
+    std::shared_ptr<Response> res = std::make_shared<Response>();
+    res->status = Response::Status::Successful;
+    res->data = util::read_file(req->resource.url);
+    res->data.insert(0, "CORRUPTED");
+
+    req->notify(res);
+}
+
+void MockFileSource::Impl::replyWithSuccess(Request* req) const {
+    std::shared_ptr<Response> res = std::make_shared<Response>();
+    res->status = Response::Status::Successful;
+    res->data = util::read_file(req->resource.url);
+
+    req->notify(res);
+}
+
+void MockFileSource::Impl::replyWithSuccessWithDelay(Request* req) {
+    pendingRequests_.push_back(req);
+}
+
+void MockFileSource::Impl::handleRequest(Request* req) {
     switch (type_) {
     case Type::Success:
-        replyWithSuccess(response.get(), url);
+        replyWithSuccess(req);
+        break;
+    case Type::SuccessWithDelay:
+        replyWithSuccessWithDelay(req);
         break;
     case Type::RequestFail:
-        replyWithFailure(response.get());
+        replyWithFailure(req);
+        break;
+    case Type::RequestFailWithDelay:
+        replyWithFailureWithDelay(req);
         break;
     case Type::RequestWithCorruptedData:
-        replyWithCorruptedData(response.get(), url);
+        replyWithCorruptedData(req);
         break;
     default:
         EXPECT_TRUE(false) << "Should never be reached.";
     }
-
-    req->notify(response);
 }
 
 MockFileSource::MockFileSource(Type type, const std::string& match)
