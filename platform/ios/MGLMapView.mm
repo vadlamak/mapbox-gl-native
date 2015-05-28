@@ -113,7 +113,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float, std::chrono::seconds::period>(duration));
 }
 
-- (nullable instancetype)initWithFrame:(CGRect)frame
+- (instancetype)initWithFrame:(CGRect)frame
 {
     if (self = [super initWithFrame:frame])
     {
@@ -123,7 +123,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return self;
 }
 
-- (nullable instancetype)initWithFrame:(CGRect)frame styleURL:(nullable NSURL *)styleURL
+- (instancetype)initWithFrame:(CGRect)frame styleURL:(nullable NSURL *)styleURL
 {
     if (self = [super initWithFrame:frame])
     {
@@ -133,7 +133,7 @@ std::chrono::steady_clock::duration secondsAsDuration(float duration)
     return self;
 }
 
-- (nullable instancetype)initWithCoder:(nonnull NSCoder *)decoder
+- (instancetype)initWithCoder:(nonnull NSCoder *)decoder
 {
     if (self = [super initWithCoder:decoder])
     {
