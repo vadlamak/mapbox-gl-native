@@ -3,6 +3,8 @@
 set -e
 set -o pipefail
 
+source ./scripts/linux/setup.sh
+
 BUILDTYPE=${BUILDTYPE:-Release}
 TESTMUNK=${TESTMUNK:-no}
 export HOST=android
@@ -29,6 +31,42 @@ mapbox_time "build_apk" \
 make android -j${JOBS} BUILDTYPE=${BUILDTYPE}
 
 ################################################################################
+# Test
+################################################################################
+
+if [ ${MASON_ANDROID_ABI} == "arm-v7" ] && [ ${BUILDTYPE} == "Debug" ] ; then
+
+    mapbox_time_start "start_emulator"
+    echo "Starting the emulator..."
+    android create avd -n test -t android-22 -b armeabi-v7a -d "Nexus 5"
+    emulator -avd test -no-skin -no-audio -no-window &
+    ./scripts/android/wait_for_emulator.sh
+    mapbox_time_finish
+
+    mapbox_time_start "calabash_test"
+    echo "Running Calabash tests..."
+
+    APK_OUTPUTS=./android/java/MapboxGLAndroidSDKTestApp/build/outputs/apk
+
+    if [ ${BUILDTYPE} == "Debug" ] ; then
+        cp \
+            ${APK_OUTPUTS}/MapboxGLAndroidSDKTestApp-debug.apk \
+            ./test/android/test.apk
+    elif [ ${BUILDTYPE} == "Release" ] ; then
+        cp \
+            ${APK_OUTPUTS}/MapboxGLAndroidSDKTestApp-release-unsigned.apk \
+            ./test/android/test.apk
+    fi
+
+    pushd ./test/android
+    calabash-android resign test.apk
+    calabash-android run test.apk
+    popd
+
+    mapbox_time_finish
+fi
+
+################################################################################
 # Deploy
 ################################################################################
 
@@ -42,7 +80,6 @@ if [ ! -z "${AWS_ACCESS_KEY_ID}" ] && [ ! -z "${AWS_SECRET_ACCESS_KEY}" ] ; then
     echo "Deploying results..."
 
     S3_PREFIX=s3://mapbox/mapbox-gl-native/android/build/${TRAVIS_JOB_NUMBER}
-    APK_OUTPUTS=./android/java/MapboxGLAndroidSDKTestApp/build/outputs/apk
 
     # Upload either the debug or the release build
     if [ ${BUILDTYPE} == "Debug" ] ; then
